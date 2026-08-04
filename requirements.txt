@@ -1,0 +1,13 @@
+media server backend high level functionality:
+	1. should facilitate the functionality of movie search requests on the server's backend
+	2. should facilitate the functionality of accepting movie acquisition requests from client
+		ideally, this is done via a background torrent-daemon-type-thread
+	3. should facilitate the typical functionality of streaming media to client
+		3a. play, pause, seek, different speeds, rewind, fast-forward
+
+client high level functionality:
+	1. should be able to search for movies via requests to server's backend
+	2. should be able to view all available movies initially
+	3. should be able to select a movie and commence streaming it via a player
+	4. should be able to send movie acquisition requests (TBD for how this should work -- if i have a torrent daemon grabbing movies, how would/should a client request translate to the daemon) 
+	 
