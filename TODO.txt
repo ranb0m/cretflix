@@ -1,0 +1,69 @@
+kernel config for latency
+	slackware linux custom compiled kernel
+	pruned POSIX, sysvinit w/ no background logging
+	config_preempt_NONE selected
+
+fs layout
+for prod:
+    - remove any synchronous I/O (read-s, fprintf-s go to special logging
+      queue instead)
+    - hardware optimizations if possible
+local testing procedure:
+	compiled custom kernel and boot via new elilo entry	
+	partitioned local nvme using cfdisk, formatted as xfs
+	mount: mount -t xfs -o noatime,largeio,inode64 /dev/nvme0n1p6 /mnt/media_test
+hardware specs
+additional commands?
+-low watermark optimization to eliminate hardware stalling (done, i think?)
+-worker needs to calculate average bitrate of media file during ingestion and
+store in dictionary (done, i think?)
+
+-xfs allocation groups for prod server, maybe make this configurable to
+hardware if possible
+
+-include initrd for prod server environment? why or why not? benefits to not
+including?
+
+
+so far:
+    The Robin Hood Hash Dictionary: Replacement of the O(N) linear scan with an O(1) hash table, minimizing probe variance to guarantee deterministic lookup bounds under load.
+
+    Read-Copy-Update (RCU) Synchronization: Implementation of lock-free memory barriers, allowing the Dispatcher to read the dictionary without mutex contention while the Worker daemon executes asynchronous ingestion writes.
+
+    Ingestion & Bitrate Calculus: Augmentation of the Worker to calculate and store the specific average bitrate (Rmedia​) of each file during the initial metadata parsing phase.
+
+    The Low Watermark Trigger (Prefetching): Injection of asynchronous posix_fadvise calls at the 75% boundary of the active chunk to eliminate the 46-millisecond hardware stall during NVMe PS0 wake states.
+
+    SPSC Ring Buffer Logging: Complete eradication of synchronous, thread-blocking fprintf calls from the primary event loop, replaced by a Single-Producer Single-Consumer lock-free ring buffer for background log flushing.
+
+    Protocol Alignment & Expansion: Explicit 64-byte __attribute__((aligned(64))) padding of the MediaHeader struct to prevent cache-line false sharing, alongside the introduction of the CMD_TEARDOWN directive.
+
+    Token Bucket Network Pacing: Implementation of a strict mathematical throttle bound by Ratetarget​, preventing the zero-copy pipeline from violently overflowing client TCP Receive Windows.
+
+    Slowloris Mitigation: Enforced hardware-level io_uring_prep_link_timeout constraints on the initial 40-byte read to protect the socket queue from deliberate starvation attacks.
+
+    Initrd Eradication: Removal of the Initial RAM Disk overhead, baking the NVMe and XFS drivers directly into the vmlinuz binary for mathematically deterministic, bare-metal UEFI booting.
+
+    Filesystem Topology Mapping: Reformatting the 100GB substrate utilizing XFS Allocation Groups (agcount) mapped precisely to the physical core count of your Intel CPU to eliminate metadata locking contention.
+
+    Kernel Scheduling Subjugation: Hardening the kernel compilation by disabling CONFIG_PREEMPT and enabling NO_HZ_FULL to grant the io_uring polling thread absolute, uninterrupted dominance over its assigned silicon.
+
+    Instruction Pipeline Optimization: Deployment of unlikely() and likely() GCC compiler built-ins throughout the dispatcher.c state machine to dictate static branch prediction and eliminate CPU pipeline flushes during error handling.
+
+
+
+
+prod server hardware stuff:
+- figure out NUMA topology 
+lscpu | grep NUMA
++ which cpu socket owns nvme controllre
+
+cat /sys/class/nvme/nvme0/device/numa_node
+
+find the cores assoicated with that node
+numactl --hardware   (might have to slackpkg this)
+
+# specify which cores to give which daemons for prod, e.g.
+./server --dispatcher-core=16 --worker-cores=17,18,19,20
+
+also disable IRQ balance for nvme-owning core
